@@ -1,0 +1,10 @@
+pandas
+networkx
+obonet
+node2vec
+gensim
+scikit-learn
+umap-learn
+plotly
+torch
+pykeen

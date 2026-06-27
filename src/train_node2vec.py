@@ -19,7 +19,7 @@ def load_graph_from_csv(
     Parameters
     ----------
     nodes_path:
-        Paht to nodes CSV file. Expected columns:
+        Path to nodes CSV file. Expected columns:
         node_id, node_type, label
 
     edges_path:
