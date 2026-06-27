@@ -75828,7 +75828,6 @@ name: developmental and epileptic encephalopathy
 def: "An electroclinical syndrome characterized by epileptiform activity and at least one other pathology that together contribute to cognitive and behavioral impairments including developmental delay or regression with onset anywhere from birth to adulthood." [url:https\://pubmed.ncbi.nlm.nih.gov/28276062/, url:https\://pubmed.ncbi.nlm.nih.gov/31926847/]
 xref: MIM:PS308350
 is_a: DOID:0050701 ! electroclinical syndrome
-OMIM:619340
 
 [Term]
 id: DOID:0112203
