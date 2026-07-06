@@ -204,6 +204,47 @@ def extract_entity_embeddings(
     return pd.DataFrame(rows)
 
 
+def extract_disease_embeddings(
+    result,
+    entitiy_metadata: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Extract embeddings only for disease entities.
+
+    Parameters
+    ----------
+    result:
+        PyKEEN PipelineResult.
+    entity_metadata:
+        Dataframe with columns: entity_id, entity_type, label
+    """
+    required_columns = {"entity_id", "entity_type", "label"}
+    missing = required_columns - set(entitiy_metadata.columns)
+
+    if missing:
+        raise ValueError(f"Missing metadata columns: {missing}")
+    
+    disease_metadata = entitiy_metadata[
+        entitiy_metadata["entity_type"] == "disease"
+    ].copy()
+
+    disease_ids = disease_metadata["entity_id"].tolist()
+
+    disease_embeddings = extract_entity_embeddings(
+        result=result,
+        entity_ids=disease_ids,
+    )
+
+    disease_embeddings = disease_embeddings.merge(
+        disease_metadata,
+        on="entity_id",
+        how="left",
+    )
+
+    return disease_embeddings
+
+
+
 def save_embedding(
     embeddings: pd.DataFrame,
     output_path: str | Path,

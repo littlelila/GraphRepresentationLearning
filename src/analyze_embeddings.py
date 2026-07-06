@@ -8,29 +8,44 @@ import umap
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def load_disease_embeddings(path: str | Path) -> pd.DataFrame:
+def load_disease_embeddings(
+    path: str | Path,
+    id_column: str = "node_id",
+) -> pd.DataFrame:
     """
     Load disease embeddings from CSV.
 
+    Parameters
+    ----------
+    path:
+        Path to the embedding CSV file.
+    id_columns:
+        Name of the identifier column.
+
+            For Node2Vec embeddings: id_column = "node_id"
+
+            For TransE embeddings: id_column = "entity_id"
+
+
     Expected columns:
-        node_id, dim_0, dim_1, ..., node_type, label
+        id_column, dim_0, dim_1, ..., node_type, label
     """
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(f"Embedding file not found: {path}")
     
-    embeddings = pd.read_csv(path, dtype={"node_id": str})
+    embeddings = pd.read_csv(path, dtype={id_column: str})
 
-    if "node_id" not in embeddings.columns:
-        raise ValueError("Embedding file must contain a 'node_id' column.")
+    if id_column not in embeddings.columns:
+        raise ValueError(f"Embedding file must contain a '{id_column}' column.")
     
     return embeddings
 
 
 def get_embedding_columns(embeddings: pd.DataFrame) -> list[str]:
     """
-    Return all embedding dimesion columns.
+    Return all embedding dimesion columns sorted by dimension number.
     """
     embedding_columns = [
         column
@@ -41,13 +56,18 @@ def get_embedding_columns(embeddings: pd.DataFrame) -> list[str]:
     if not embedding_columns:
         raise ValueError("No embedding column found. Expected columns named dim_0, dim_1, ...")
     
-    return embedding_columns
+    return sorted(
+        embedding_columns,
+        key=lambda column: int(column.split("_")[1])      
+    )
 
 
 
 def compute_nearest_neighbors(
     embeddings: pd.DataFrame,
     top_k: int = 10,
+    id_column: str = "node_id",
+    similarity_column: str = "cosine_similarity"
 ) -> pd.DataFrame:
     """
     Compute top_k nearest neigbors using cosine similarity.
@@ -58,17 +78,25 @@ def compute_nearest_neighbors(
         DataFrame with one row per disease and embedding columns dim_*
     top_k:
         Number of nearest neigbors to return per disease.
+    id_column:
+        Identifier column.
+
+        For Node2Ved: id_column = "node_id"
+
+        For TransE: id_column = "entity_id"
+    similarity_column:
+        Name of the similarity output column.
 
     Returns
     -------
     pandas.DataFrame
         Neigbor table with columns:
-        disease_id, disease_lable, neighbor_id, neighbor_lable, rank, cosine_similarity
+        disease_id, disease_lable, neighbor_id, neighbor_lable, rank, similarity_column
     """
     embedding_columns = get_embedding_columns(embeddings)
 
-    disease_ids = embeddings["node_id"].tolist()
-    disease_labels = embeddings.get("label", embeddings["node_id"]).tolist()
+    disease_ids = embeddings[id_column].tolist()
+    disease_labels = embeddings.get("label", embeddings[id_column]).tolist()
 
     label_by_id = dict(zip(disease_ids, disease_labels))
 
@@ -98,7 +126,7 @@ def compute_nearest_neighbors(
                     "neighbor_id": disease_ids[j],
                     "neighbor_label": label_by_id.get(disease_ids[j], disease_ids[j]),
                     "rank": rank,
-                    "cosine_similarity": float(similarities[j])
+                    similarity_column: float(similarities[j])
                 }
             )
 
@@ -255,13 +283,43 @@ def compute_umap_projection(
     min_dist: float = 0.1,
     metric: str = "cosine",
     random_state: int = 5,
+    id_column: str = "node_id",
 ) -> pd.DataFrame:
     """
     Project disease embeddings to 2D using UMAP.
 
+    Parameters
+    ----------
+    embeddings:
+        Disease embedding dataframe.
+    n_neighbors:
+        UMAP neighborhood size.
+    min_dist:
+        UMAP minimum distance.
+    metric:
+        Distance metric used by UMAP.
+    random_state:
+        Random seed.
+    id_column:
+        Identifier column.
+
+        For Node2Vec: id_column = "node_id"
+
+        For TransE: id_column = "entity_id"
+
+    Returns
+    -------
+    pandas.DataFrame
+        Projection dataframe with columsn: node_id, x, y, label, optionally node_type/entity_type
+
+    
+    Output column is still called node_id for compatiblity with existing code.
     UMAP is used only for visualization.
     The original high-dimensional similarties should still be kept.
     """
+    if id_column not in embeddings.columns:
+        raise ValueError(f"Embeddings must contain ID column '{id_column}'.")
+
     embedding_columns = get_embedding_columns(embeddings)
 
     matrix = embeddings[embedding_columns].to_numpy(dtype=float)
@@ -277,7 +335,7 @@ def compute_umap_projection(
 
     projection = pd.DataFrame(
         {
-            "node_id": embeddings["node_id"],
+            "node_id": embeddings[id_column],
             "x": coordinates[:, 0],
             "y": coordinates[:, 1],
         }
@@ -285,15 +343,19 @@ def compute_umap_projection(
 
     metadata_columns = [
         column
-        for column in ["node_type", "label"]
+        for column in ["node_type", "entity_type", "label"]
         if column in embeddings.columns
     ]
 
     projection = projection.merge(
-        embeddings[["node_id", *metadata_columns]],
-        on="node_id",
+        embeddings[[id_column, *metadata_columns]],
+        left_on="node_id",
+        right_on=id_column,
         how="left",
     )
+
+    if id_column != "node_id" and id_column in projection.columns:
+        projection = projection.drop(columns=[id_column])
 
     return projection
 

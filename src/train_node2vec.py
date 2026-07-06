@@ -146,7 +146,7 @@ def extract_node_embeddings(
     Parameters
     ----------
     model:
-        Trained Noced2Vec / Word2Vec model.
+        Trained NodeVec / Word2Vec model.
     nodes:
         Node IDs to extract.
     dimensions:
